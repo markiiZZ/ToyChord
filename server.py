@@ -17,24 +17,20 @@ class Server(object):
     def __init__(self, ip_addr, port, master):
         """Every new implemented method must be added to the dictionary
         with 'key' a unique identifier as below"""
-        self.operations = {
-                           'del': self.__del__,
-                           }
+        self.methods = {
+                           'del': self.__del__
+                        #   'join': self.__join
+                       }
 #        self.close = False LATER
         self.ip_addr = ip_addr
         self.port = str(port)
-        print(self.port)
-        self.pair = '{};{}'.format(ip_addr, port)
-        print(self.pair)
-        self.poop = (self.ip_addr, self.port)
-        print(self.poop)
+        self.main_port = master
+        self.pair = (self.ip_addr, self.port)
+
         m = sha1()
-        for s in self.poop:
+        for s in self.pair:
             m.update(s.encode())
         self.hash = m.hexdigest()
-        print(m)
-
-        print(self.hash)
 
         self.data = {}
 #        self.replication = 0 LATER
@@ -48,11 +44,11 @@ class Server(object):
         except socket.error as msg:
             logging.error('Bind failed. Error Code : ' + str(msg[0]) + ' Message ' + msg[1])
             sys.exit()
-        self.port = self.sock.getsockname()[1]
+#        self.port = self.sock.getsockname()[1]
         #self.sock.settimeout(1) #CHECK
         self.sock.listen(10)    #CHECK
         print("success")
-#        self.neighbors = Neighbors(self.hash, self.port, self.hash, self.port) LATER
+        self.adjacent = Adjacent(self.hash, self.port, self.hash, self.port) 
 
         self.message_queues = {}  # servers' reply messages
 
@@ -66,18 +62,17 @@ class Server(object):
         data = conn.recv(1024)
         print(data)
 
-class Client(object):
+class Bootstrap(Server):
+    def __init__(self, ip_addr, port):
+        self.network_size = 1
+        super(Bootstrap, self).__init__(ip_addr, port, port)
+        #replication LATER
 
-    def __init__(self, PORT):
-        self.PORT=int(PORT)
+def discover_adjacent(hash, port):
+    sock = Communication(port)
+    a = sock.socket_comm('join:' + hash).split(':')
+    return int(a[0]), a[1], int(a[2]), a[3]
 
-        self.client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.client_socket.connect(('127.0.0.1', self.PORT))
-        print("connect ok")
-
-    def communication(self,message):
-        try:
-            self.client_socket.send(message)
-        except socket.error:
-            logging.error('client: SEND MESSAGE FAIL')
-            sys.exit()
+def send_message(port, message):
+    sock = Communication(port)
+    return sock.socket_comm(message)

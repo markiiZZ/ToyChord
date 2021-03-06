@@ -4,6 +4,7 @@ import cmd2
 import sys
 import time
 from server import Server, Client
+#from intermediate import Intermediate
 
 class ToyChord(cmd2.Cmd):
 
@@ -18,13 +19,15 @@ class ToyChord(cmd2.Cmd):
 
     def do_bootstrap(self, port):
         """bootstrap enters the DHT"""
-        bootstr = Server("127.0.0.1", port, port)
-        bootstr.connection()
+        self.bootstr = Bootstrap("127.0.0.1", port)
 
     def do_fake(self, port):
         pelatis = Client(port)
         pelatis.communication(b'hello world')
 
+    def do_print(self, random):
+        port = self.bootstr.port
+        print(port)
 
 
 
