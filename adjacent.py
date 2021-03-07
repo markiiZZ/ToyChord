@@ -11,19 +11,19 @@ class Adjacent(object):
         self.succ_hash = succ_hash
         self.succ_port = succ_port
 
-    def notify_adjacent(self, new_hash, new_port, my_port, my_hash, flag):
+    def notify_adjacent(self, new_port, new_hash, my_port, my_hash, flag):
         sock = Communication(new_port)
         if (flag == 0): #0 is for pred
-            sock.socket_comm('front:' + str(my_port) + my_hash)
+            sock.socket_comm('front:' + str(my_port) + ':' + my_hash)
             self.pred_hash = new_hash
             self.pred_port = new_port
         else:
-            sock.socket_comm('back:' + str(my_port) + my_hash)
+            sock.socket_comm('back:' + str(my_port) + ':' + my_hash)
             self.succ_hash = new_hash
             self.succ_port = new_port
     #logging
 
-    def update_adjacent(self, new_hash, new_port, flag):
+    def update_adjacent(self, new_port, new_hash, flag):
         if (flag == 0):
             self.pred_hash = new_hash
             self.pred_port = new_port
@@ -42,4 +42,4 @@ class Adjacent(object):
         if(flag == 0):
             return str(self.pred_port) + ':' + self.pred_hash
         else:
-            return str(self.succ_port) + ':' + self.succ_port
+            return str(self.succ_port) + ':' + self.succ_hash
