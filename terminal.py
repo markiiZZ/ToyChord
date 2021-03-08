@@ -25,15 +25,37 @@ class ToyChord(cmd2.Cmd):
     def do_join(self, port):
         self.node = Server("127.0.0.1", port, 5000)
         self.node.join_DHT()
-        threading.Thread(target = self.node.connection, args = ()).start()
+        my_thread = threading.Thread(target = self.node.connection, args = ()).start()
         #sys.exit()
 
     def do_insert(self, line):
-        key = line.split(',')[0]
-        value = line.split(',')[1]
+        key = line.split(', ')[0]
+        value = line.split(', ')[1]
         port = self.node.port
-        socket = Communication(port)
-        socket.socket_comm('insert:{}:{}'.format(key, value))
+        with Communication(port) as sock:
+            sock.socket_comm('insert:{}:{}'.format(key, value))
+
+    def do_query(self, key):
+        port = self.node.port
+        if (key == '*'):
+            with Communication(port) as sock:
+                sock.socket_comm('query_all')
+        else:
+            with Communication(port) as sock:
+                sock.socket_comm('query:{}'.format(key))
+
+    def do_delete(self, key):
+        port = self.node.port
+        with Communication(port) as sock:
+            sock.socket_comm('delete:{}'.format(key))
+
+    def do_depart(self):
+        port = self.port
+        with Communication(port) as sock:
+            sock.socket_comm('depart')
+        my_thread.join()
+
+
 
     def do_print(self, random):
         port = self.bootstr.port

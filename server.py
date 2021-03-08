@@ -30,7 +30,15 @@ class Server(object):
                            'back': self.update_pred,
                            'get_from_succ': self.get_from_succ,
                            'update': self.update,
-                           'insert': self.insert
+                           'insert': self.insert,
+                           'quit': self.quit,
+                           'query_all': self.query_all,
+                           'print_node_songs': self.print_node_songs,
+                           'query': self.query,
+                           'query_forward': self.query_forward,
+                           'delete': self.delete,
+                           'delete_forward': self.delete_forward,
+                           'depart': self.depart
                        }
 #        self.close = False LATER
         self.ip_addr = ip_addr
@@ -65,6 +73,10 @@ class Server(object):
     #def __del__(self):
         #"""Destructor"""
         #self.sock.close()
+    def quit(self, data, sock):
+        """Quits"""
+        #print("CLOSE MAN")
+        self.message_queues[sock].put('CLOSE')
 
     def bad_request(self):
         self.message_queues[sock].put('Invalid server command')
@@ -83,8 +95,10 @@ class Server(object):
     def socket_thread(self, sock):
         while True:
             try:
+                #print("asf")
                 data = sock.recv(1024).decode()
-                print(data)
+                #print("noun")
+                #print(data)
                 if not data:
                     break
                 else:
@@ -102,7 +116,12 @@ class Server(object):
                 except queue.Empty:
                     pass
                 else:
+                    #print(answer)
                     sock.send(answer.encode())
+                    if answer == 'CLOSE':
+                        del self.message_queues[sock]
+                        sock.close()
+                        return
             #things about close
 
     def place_here(self, hashing):
@@ -138,21 +157,24 @@ class Server(object):
         #with the adding of replication -> needs modification
         #_, song = data.split(':') in the basic retreival you take everything from the succ
         self.data_lock.acquire()
-        if(not self.data):
-            print("adeios")
+        #if(not self.data):
+            #print("adeios")
+        entries_to_del = []
         for (key, value) in self.data.items():
             if not self.place_here(key):
                 #kai alla orismata sthn update gia replication
-                message = 'update:{}:{}'.format(key, value[0], value[1])
+                message = 'update:{}:{}:{}'.format(key, value[0], value[1])
                 #mhpws de xreiazetai to thread?
-                threading.Thread(target = send_adjacent, args = (message, 0)).start()
+                threading.Thread(target = self.adjacent.send_adjacent, args = (message, 0)).start()
                 #ayta pou kanei me to None:None einai oti koitazei posoi exoun to kathe tragoudi
                 #apo tous epomenous sto ring kai apo ton teleutaio pou to exei to diagrafei wste
                 #to plhthos twn antigrafwn meta thn eisagwgh tou neou komvou na diathreitai
                 #XRHSIMO GIA REPLICATION
-                del self.data[key]
-        self.message_queues[sock].put('DONE')
+                entries_to_del.append(key)
+        for key in entries_to_del:
+            del self.data[key]
         self.data_lock.release()
+        self.message_queues[sock].put('DONE')
 
     def update(self, data, sock):
         #replication -> xamos
@@ -170,18 +192,117 @@ class Server(object):
         hash_key = sha1(key1).hexdigest()
         #logging
         self.data_lock.acquire()
-        print("mphka")
+        #print("mphka")
+        #efoson to dictionary den uposthrizei duplicates isws einai peritto to if
         if (self.data.get(hash_key) == (key, value)):
             self.data_lock.release()
+            #print("already exists")
         elif self.place_here(hash_key):
             self.data[hash_key] = (key,value)
             self.data_lock.release()
+            #print(self.port, self.data[hash_key])
+            self.message_queues[sock].put('DONE')
              #pragmata me REPLICATION
         else:
+            #print("stelnw geitona")
             self.data_lock.release()
             #gt na to valw se queue?
-            self.adjacent.send_adjacent(data, 1)
-        print(self.port, self.data[hash_key])
+            #POLY XRHSIMO TELIKA
+            self.message_queues[sock].put(self.adjacent.send_adjacent(data, 1))
+
+    def print_node_songs(self, data, sock):
+        _, hash_of_first = data.split(':')
+        if (hash_of_first == self.hash):
+            self.message_queues[sock].put('DONE')
+        else:
+            self.data_lock.acquire()
+            print(self.port) #isws axreiasto
+            for (key, value) in self.data.items():
+                print(value)
+            self.data_lock.release()
+            self.message_queues[sock].put(self.adjacent.send_adjacent(data, 1))
+
+    def query_all(self, data, sock):
+        self.data_lock.acquire()
+        print(self.port) #isws axreiasto
+        for (key, value) in self.data.items():
+            print(value)
+        self.data_lock.release()
+        if (self.adjacent.succ_hash != self.hash):
+            self.message_queues[sock].put(self.adjacent.send_adjacent('print_node_songs:{}'.format(self.hash), 1))
+        else:
+            self.message_queues[sock].put('DONE')
+
+    def query_forward(self, data, sock):
+        _, key, hash_of_first = data.split(':')
+        key1 = key.encode()
+        hash_key = sha1(key1).hexdigest()
+        self.data_lock.acquire()
+        if (self.data.get(hash_key, None)!= None):
+            print(self.data[hash_key][1])
+            self.data_lock.release()
+            self.message_queues[sock].put('DONE')
+        else:
+            if (hash_of_first == self.hash):
+                self.data_lock.release()
+                print('This song does not exist')
+                self.message_queues[sock].put('FAIL')
+            else:
+                self.data_lock.release()
+                self.message_queues[sock].put(self.adjacent.send_adjacent(data, 1))
+
+    def query(self, data, sock):
+        _, key = data.split(':')
+        key1 = key.encode()
+        hash_key = sha1(key1).hexdigest()
+        self.data_lock.acquire()
+        if (self.data.get(hash_key, None)!= None):
+            print(self.data[hash_key][1])
+            self.data_lock.release()
+            self.message_queues[sock].put('DONE')
+        else:
+            self.data_lock.release()
+            self.message_queues[sock].put(self.adjacent.send_adjacent('query_forward:{}:{}'.format(key, self.hash), 1))
+
+    def delete_forward(self, data, sock):
+        _, key, hash_of_first = data.split(':')
+        key1 = key.encode()
+        hash_key = sha1(key1).hexdigest()
+        self.data_lock.acquire()
+        if (self.data.get(hash_key, None)!= None):
+            del self.data[hash_key]
+            self.data_lock.release()
+            self.message_queues[sock].put('DONE')
+        else:
+            if (hash_of_first == self.hash):
+                self.data_lock.release()
+                print('This song does not exist')
+                self.message_queues[sock].put('FAIL')
+            else:
+                self.data_lock.release()
+                self.message_queues[sock].put(self.adjacent.send_adjacent(data, 1))
+
+    def delete(self, data, sock):
+        _, key = data.split(':')
+        key1 = key.encode()
+        hash_key = sha1(key1).hexdigest()
+        self.data_lock.acquire()
+        if (self.data.get(hash_key, None)!= None):
+            del self.data[hash_key]
+            self.data_lock.release()
+            self.message_queues[sock].put('DONE')
+        else:
+            self.data_lock.release()
+            self.message_queues[sock].put(self.adjacent.send_adjacent('delete_forward:{}:{}'.format(key, self.hash), 1))
+
+    def depart(self, data, sock):
+                    
+
+
+
+
+
+
 
 
 
@@ -199,11 +320,15 @@ class Bootstrap(Server):
         super(Bootstrap, self).join(data, sock)
         #add the replication to the queue
 
+    def depart(self, data, sock):
+        self._network_size -= 1
+        self.message_queues[sock].put('DONE')
+
 def discover_adjacent(hash, port):
-    socket = Communication(port)
-    a = socket.socket_comm('join:' + hash).split(':')
+    with Communication(port) as socket:
+       a = socket.socket_comm('join:' + hash).split(':')
     return int(a[0]), a[1], int(a[2]), a[3]
 
 def send_message(port, message):
-    socket = Communication(port)
-    return socket.socket_comm(message)
+    with Communication(port) as socket:
+       return socket.socket_comm(message)
