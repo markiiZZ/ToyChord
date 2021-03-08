@@ -19,24 +19,26 @@ class ToyChord(cmd2.Cmd):
     def do_bootstrap(self, port):
         """bootstrap enters the DHT"""
         self.node = Bootstrap("127.0.0.1", port)
-        threading.Thread(target = self.node.connection, args = ()).start()
+        threading.Thread(target = self.node.accept_connection, args = ()).start()
         #sys.exit() #mallon
 
     def do_join(self, port):
         self.node = Server("127.0.0.1", port, 5000)
         self.node.join_DHT()
-        threading.Thread(target = self.node.connection, args = ()).start()
+        threading.Thread(target = self.node.accept_connection, args = ()).start()
         #sys.exit()
 
     def do_insert(self, line):
         key = line.split(',')[0]
         value = line.split(',')[1]
         port = self.node.port
-        socket = Communication(port)
-        socket.socket_comm('insert:{}:{}'.format(key, value))
+        with Communication(port) as sock:
+            sock.socket_comm('insert:{}:{}'.format(key, value))
+        print("hey")
+        #sock.socket_close()
 
     def do_print(self, random):
-        port = self.bootstr.port
+        port = self.node.port
         print(port)
 
     def do_exit(self, line):

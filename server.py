@@ -30,7 +30,8 @@ class Server(object):
                            'back': self.update_pred,
                            'get_from_succ': self.get_from_succ,
                            'update': self.update,
-                           'insert': self.insert
+                           'insert': self.insert,
+                           'quit': self.quit
                        }
 #        self.close = False LATER
         self.ip_addr = ip_addr
@@ -61,6 +62,7 @@ class Server(object):
         self.adjacent = Adjacent(self.hash, self.port, self.hash, self.port)
 
         self.message_queues = {}  # servers' reply messages
+        self.thread_list = []
 
     #def __del__(self):
         #"""Destructor"""
@@ -77,15 +79,19 @@ class Server(object):
                 pass
             else:
                 self.message_queues[connect] = Queue()
-                threading.Thread(target = self.socket_thread, args = (connect,)).start()
+                self.thread_list.append(threading.Thread(target = self.socket_thread, args = (connect,)))
+                self.thread_list[-1].start()
     #things about close
 
     def socket_thread(self, sock):
         while True:
             try:
-                data = sock.recv(1024).decode()
+                print("peos?")
+                data = sock.recv(1024).decode() # edw einai to provlhma, kollaei sthn insert, me ctrl+c "lunetai"
+                print("oxi")
                 print(data)
                 if not data:
+                    print("BREAK THE MAIN LOOP")
                     break
                 else:
                     command = self.methods.get(data.split(':')[0])
@@ -102,8 +108,24 @@ class Server(object):
                 except queue.Empty:
                     pass
                 else:
+                    print(answer)
                     sock.send(answer.encode())
+                    if answer == 'CLOSE MAN':
+                        del self.message_queues[sock]
+                        sock.close()
+                        return
             #things about close
+
+    def quit(self, data, sock):
+        """Quits"""
+        print("CLOSE MAN")
+        self.message_queues[sock].put('CLOSE MAN')
+
+    def accept_connection(self):
+        """Main loop"""
+        while True:
+            self.connection()
+
 
     def place_here(self, hashing):
         #mallon swsto
@@ -140,16 +162,18 @@ class Server(object):
         self.data_lock.acquire()
         if(not self.data):
             print("adeios")
-        for (key, value) in self.data.items():
+        tmp = self.data
+        for key, value in list(tmp.items()): #fixed small bug
             if not self.place_here(key):
                 #kai alla orismata sthn update gia replication
-                message = 'update:{}:{}'.format(key, value[0], value[1])
+                message = 'update:{}:{}:{}'.format(key, value[0], value[1])
                 #mhpws de xreiazetai to thread?
-                threading.Thread(target = send_adjacent, args = (message, 0)).start()
+                threading.Thread(target = self.adjacent.send_adjacent, args = (message, 0)).start()
                 #ayta pou kanei me to None:None einai oti koitazei posoi exoun to kathe tragoudi
                 #apo tous epomenous sto ring kai apo ton teleutaio pou to exei to diagrafei wste
                 #to plhthos twn antigrafwn meta thn eisagwgh tou neou komvou na diathreitai
                 #XRHSIMO GIA REPLICATION
+                print("RETRIEVE")
                 del self.data[key]
         self.message_queues[sock].put('DONE')
         self.data_lock.release()
@@ -173,15 +197,19 @@ class Server(object):
         print("mphka")
         if (self.data.get(hash_key) == (key, value)):
             self.data_lock.release()
+            print("already exists")
         elif self.place_here(hash_key):
             self.data[hash_key] = (key,value)
             self.data_lock.release()
+            print(self.port, self.data.get(hash_key))
              #pragmata me REPLICATION
         else:
+            print("stelnw geitona")
             self.data_lock.release()
             #gt na to valw se queue?
             self.adjacent.send_adjacent(data, 1)
-        print(self.port, self.data[hash_key])
+        print("HEY")
+
 
 
 
@@ -200,10 +228,10 @@ class Bootstrap(Server):
         #add the replication to the queue
 
 def discover_adjacent(hash, port):
-    socket = Communication(port)
-    a = socket.socket_comm('join:' + hash).split(':')
+    with Communication(port) as socket:
+        a = socket.socket_comm('join:' + hash).split(':')
     return int(a[0]), a[1], int(a[2]), a[3]
 
 def send_message(port, message):
-    socket = Communication(port)
-    return socket.socket_comm(message)
+    with Communication(port) as socket:
+        return  socket.socket_comm(message)

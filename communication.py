@@ -11,6 +11,25 @@ class Communication(object):
         self.comm_socket.connect(('127.0.0.1', self.PORT))
         print("connect ok")
 
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        print("EXIT WITH AS")
+        self.close()
+        return False
+
+    def __enter__(self):
+        return self
+
+    def close(self):
+        try:
+            self.comm_socket.send(b'quit')
+        except socket.error:
+            logging.error('client: CLOSURE WAS UNSUCCESSFUL')
+            sys.exit()
+        else:
+            self.comm_socket.recv(1024)
+            self.comm_socket.close()
+
     def socket_comm(self,message):
         try:
             print("edw krasarei")
@@ -19,11 +38,20 @@ class Communication(object):
             print("oxi edw")
         except socket.error:
             logging.error('socket: SEND MESSAGE FAIL')
+            print("shit1")
             sys.exit()
         try:
-            self.answer = self.comm_socket.recv(1024)
+            print("hi")
+            self.answer = self.comm_socket.recv(1024) # ki edw uparxei thema otan kanw insert
+            print("good")
         except socket.error:
             logging.error('socket: RECEIVE MESSAGE FAIL')
+            print("shit2")
             sys.exit()
         else:
+            print("ok i guess from socket comm")
             return self.answer.decode()
+
+    #def socket_close(self):
+    #    self.comm_socket.close()
+    #    print("socket closed")
