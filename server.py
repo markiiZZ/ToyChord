@@ -72,6 +72,7 @@ class Server(object):
         self.adjacent = Adjacent(self.hash, self.port, self.hash, self.port)
 
         self.message_queues = {}  # servers' reply messages
+        self.thread_list = []
 
     #def __del__(self):
         #"""Destructor"""

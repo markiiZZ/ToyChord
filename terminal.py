@@ -71,7 +71,7 @@ class ToyChord(cmd2.Cmd):
 
 
     def do_print(self, random):
-        port = self.bootstr.port
+        port = self.node.port
         print(port)
 
 

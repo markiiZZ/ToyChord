@@ -1,4 +1,7 @@
+
+ERROR:root:Data recv failed
 ERROR:root:socket: RECEIVE MESSAGE FAIL
+<<<<<<< HEAD
 ERROR:root:socket: RECEIVE MESSAGE FAIL
 ERROR:root:socket: RECEIVE MESSAGE FAIL
 ERROR:root:socket: RECEIVE MESSAGE FAIL
@@ -13,3 +16,6 @@ ERROR:root:Data recv failed
 ERROR:root:Data recv failed
 ERROR:root:Data recv failed
 ERROR:root:Data recv failed
+=======
+ERROR:root:client: CLOSURE WAS UNSUCCESSFUL
+>>>>>>> c8107ec5988f1e6a47045ccd3eeaa508baf1bf09

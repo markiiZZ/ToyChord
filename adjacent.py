@@ -22,6 +22,7 @@ class Adjacent(object):
                sock.socket_comm('back:' + str(my_port) + ':' + my_hash)
             self.succ_hash = new_hash
             self.succ_port = new_port
+
     #logging
 
     def update_adjacent(self, new_port, new_hash, flag):
