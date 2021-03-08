@@ -5,6 +5,7 @@ import sys
 import time
 from server import *
 from communication import Communication
+from multiprocessing import Process
 
 class ToyChord(cmd2.Cmd):
 
@@ -19,13 +20,15 @@ class ToyChord(cmd2.Cmd):
     def do_bootstrap(self, port):
         """bootstrap enters the DHT"""
         self.node = Bootstrap("127.0.0.1", port)
-        threading.Thread(target = self.node.connection, args = ()).start()
+        self.my_Process = Process(target = self.node.main_loop, args = ())
+        self.my_Process.start()
         #sys.exit() #mallon
 
     def do_join(self, port):
         self.node = Server("127.0.0.1", port, 5000)
         self.node.join_DHT()
-        my_thread = threading.Thread(target = self.node.connection, args = ()).start()
+        self.my_Process = Process(target = self.node.main_loop, args = ())
+        self.my_Process.start()
         #sys.exit()
 
     def do_insert(self, line):
@@ -49,17 +52,28 @@ class ToyChord(cmd2.Cmd):
         with Communication(port) as sock:
             sock.socket_comm('delete:{}'.format(key))
 
-    def do_depart(self):
-        port = self.port
+    def do_depart(self, line):
+        port = self.node.port
+        if (port == '5000'):
+            with Communication(port) as sock:
+                sock.socket_comm('DHT_ends')
+        else:
+            with Communication(port) as sock:
+                sock.socket_comm('depart')
+        self.my_Process.join()
+
+    def do_overlay(self, line):
+        port = self.node.port
         with Communication(port) as sock:
-            sock.socket_comm('depart')
-        my_thread.join()
+            sock.socket_comm('overlay')
+
 
 
 
     def do_print(self, random):
         port = self.bootstr.port
         print(port)
+
 
     def do_exit(self, line):
         return True

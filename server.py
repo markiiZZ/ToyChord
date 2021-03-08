@@ -38,9 +38,12 @@ class Server(object):
                            'query_forward': self.query_forward,
                            'delete': self.delete,
                            'delete_forward': self.delete_forward,
-                           'depart': self.depart
+                           'depart': self.depart,
+                           'DHT_ends': self.DHT_ends,
+                           'overlay':self.overlay,
+                           'overlay_forward':self.overlay_forward
                        }
-#        self.close = False LATER
+        self.terminates = False
         self.ip_addr = ip_addr
         self.port = str(port)
         self.main_port = master
@@ -78,18 +81,26 @@ class Server(object):
         #print("CLOSE MAN")
         self.message_queues[sock].put('CLOSE')
 
-    def bad_request(self):
+    def bad_request(self, data, sock):
         self.message_queues[sock].put('Invalid server command')
 
-    def connection(self):
+    def main_loop(self):
         while True:
-            try:
-                connect, _ = self.sock.accept()
-            except socket.timeout:
-                pass
-            else:
-                self.message_queues[connect] = Queue()
-                threading.Thread(target = self.socket_thread, args = (connect,)).start()
+            self.connection()
+            #print("jjo")
+            if self.terminates:
+                time.sleep(1)
+                #print("vgainw")
+                return
+
+    def connection(self):
+        try:
+            connect, _ = self.sock.accept()
+        except socket.timeout:
+            pass
+        else:
+            self.message_queues[connect] = Queue()
+            threading.Thread(target = self.socket_thread, args = (connect,)).start()
     #things about close
 
     def socket_thread(self, sock):
@@ -97,9 +108,11 @@ class Server(object):
             try:
                 #print("asf")
                 data = sock.recv(1024).decode()
+                #print(data)
                 #print("noun")
                 #print(data)
                 if not data:
+                    #print("iuihu")
                     break
                 else:
                     command = self.methods.get(data.split(':')[0])
@@ -123,6 +136,9 @@ class Server(object):
                         sock.close()
                         return
             #things about close
+
+    def DHT_ends(self, data, sock):
+        send_message(self.main_port, 'DHT_ends')
 
     def place_here(self, hashing):
         #mallon swsto
@@ -184,6 +200,7 @@ class Server(object):
         #if (self.data.get(hash_key) != (key,value)):
         self.data[hash_key] = (key, value)
         self.data_lock.release()
+        self.message_queues[sock].put('DONE')
         #messages sta queues xreiazontai sthn parousa fash?
 
     def insert(self, data, sock):
@@ -295,8 +312,35 @@ class Server(object):
             self.data_lock.release()
             self.message_queues[sock].put(self.adjacent.send_adjacent('delete_forward:{}:{}'.format(key, self.hash), 1))
 
+
     def depart(self, data, sock):
-                    
+        self.data_lock.acquire()
+        for (key, value) in self.data.items():
+            self.adjacent.send_adjacent('update:{}:{}:{}'.format(key, value[0], value[1]), 1)
+        self.data_lock.release()
+        self.adjacent.send_adjacent('front:{}:{}'.format(self.adjacent.succ_port, self.adjacent.succ_hash), 0)
+        self.adjacent.send_adjacent('back:{}:{}'.format(self.adjacent.pred_port, self.adjacent.pred_hash), 1)
+        send_message(self.main_port, 'depart')
+        self.terminates = True
+        self.message_queues[sock].put('DONE')
+
+    def overlay_forward(self, data, sock):
+        _, hash_of_first, curr_overlay = data.split(':')
+        if (hash_of_first == self.hash):
+            print(curr_overlay)
+            self.message_queues[sock].put('DONE')
+        else:
+            data = data + '->' + self.port
+            self.message_queues[sock].put(self.adjacent.send_adjacent(data, 1))
+            self.message_queues[sock].put('DONE')
+
+    def overlay(self, data, sock):
+        self.message_queues[sock].put(self.adjacent.send_adjacent('overlay_forward:{}:{}'.format(self.hash, self.port), 1))
+        self.message_queues[sock].put('DONE')
+
+
+
+
 
 
 
@@ -321,7 +365,13 @@ class Bootstrap(Server):
         #add the replication to the queue
 
     def depart(self, data, sock):
-        self._network_size -= 1
+        self.network_size -= 1
+        self.message_queues[sock].put('DONE')
+
+    def DHT_ends(self, data, sock):
+        #print("hiuhih")
+        self.network_size = 0
+        self.terminates = True
         self.message_queues[sock].put('DONE')
 
 def discover_adjacent(hash, port):
