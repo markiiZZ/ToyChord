@@ -2,9 +2,11 @@
 
 import cmd2
 import argparse
-from cmd2 import with_argument_list
+from cmd2 import with_argument_list, ansi
 import sys
 import time
+import click
+from pyfiglet import Figlet
 from server import *
 from communication import Communication
 from multiprocessing import Process
@@ -16,6 +18,7 @@ class ToyChord(cmd2.Cmd):
         """Initialize the base class as well as this one"""
         super().__init__()
         self.prompt = 'ToyChord@ntua$ '
+        self.allow_style = ansi.STYLE_TERMINAL
 
     def do_greet(self, person):
         """greet [person]
@@ -102,6 +105,12 @@ class ToyChord(cmd2.Cmd):
             do_overlay), CMD_CAT_TOYCHORD)
 
 def main():
+
+    f = Figlet(font='slant')
+    click.echo(f.renderText('ToyChord'))
+    click.echo(" Georgia Stavropoulou \n")
+    click.echo(" Nikoleta-Markela Iliakopoulou \n")
+    click.echo(" Stefanos-Stamatis Achlatis \n")
 
     toy = ToyChord()
     try:
