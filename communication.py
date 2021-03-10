@@ -31,7 +31,7 @@ class Communication(object):
 
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        print("EXIT WITH AS")
+        #print("EXIT WITH AS")
         self.close()
         return False
 
@@ -56,7 +56,7 @@ class Communication(object):
             #print("oxi edw")
         except socket.error:
             logging.error('socket: SEND MESSAGE FAIL')
-            print("shit1")
+            #print("shit1")
             sys.exit()
         try:
             #print("hi")
@@ -64,10 +64,10 @@ class Communication(object):
             #print("good")
         except socket.error:
             logging.error('socket: RECEIVE MESSAGE FAIL')
-            print("shit2")
+            #print("shit2")
             sys.exit()
         else:
-            print("ok i guess from socket comm")
+            #print("ok i guess from socket comm")
             return self.answer.decode()
 
     #def socket_close(self):

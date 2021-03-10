@@ -215,6 +215,7 @@ class Server(object):
         if (self.data.get(hash_key) == (key, value)):
             self.data_lock.release()
             #print("already exists")
+            self.message_queues[sock].put('DONE')
         elif self.place_here(hash_key):
             self.data[hash_key] = (key,value)
             self.data_lock.release()
