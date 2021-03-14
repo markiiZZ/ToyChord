@@ -4,31 +4,13 @@ import sys
 
 class Communication(object):
 
-    def __init__(self, PORT):
-        self.PORT=int(PORT)
-
+    def __init__(self, ADDRESS):
+        token = ADDRESS.split('&')
+        self.IP = token[0]
+        self.PORT = int(token[1])
         self.comm_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.comm_socket.connect(('127.0.0.1', self.PORT))
+        self.comm_socket.connect((self.IP, self.PORT))
         #print("connect ok")
-
-    def __enter__(self):
-        return self
-
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        self.close()
-        return False
-
-    def close(self):
-        try:
-            message = 'quit'
-            self.comm_socket.send(message.encode())
-        except socket.error:
-            logging.error('CLOSURE WAS UNSUCCESSFUL')
-            sys.exit()
-        else:
-            self.comm_socket.recv(1024)
-            self.comm_socket.close()
-
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         #print("EXIT WITH AS")
@@ -61,6 +43,7 @@ class Communication(object):
         try:
             #print("hi")
             self.answer = self.comm_socket.recv(1024)
+            #print(self.answer.decode())
             #print("good")
         except socket.error:
             logging.error('socket: RECEIVE MESSAGE FAIL')

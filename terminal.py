@@ -19,25 +19,25 @@ class ToyChord(cmd2.Cmd):
         super().__init__()
         self.prompt = 'ToyChord@ntua$ '
         self.allow_style = ansi.STYLE_TERMINAL
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(("8.8.8.8", 80))
+        self.ip_addr = s.getsockname()[0]
+        s.close()
 
-    def do_greet(self, person):
-        """greet [person]
-        Greet the named person"""
-        if person:
-            print("hi,", person)
-        else:
-            print('hi')
-
-    def do_bootstrap(self, port):
+    @with_argument_list
+    def do_bootstrap(self, line):
         """Bootstrap enters the DHT"""
-        self.node = Bootstrap("127.0.0.1", port)
+        consistency = line[0]
+        replicas = line[1]
+        port = line[2]
+        self.node = Bootstrap(self.ip_addr, port, consistency, replicas)
         self.my_Process = Process(target = self.node.main_loop, args = ())
         self.my_Process.start()
         #sys.exit() #mallon
 
     def do_join(self, port):
         """A node (not bootstrap) joins the DHT"""
-        self.node = Server("127.0.0.1", port, 5000)
+        self.node = Server(self.ip_addr, port, "192.168.1.3&5000")
         self.node.join_DHT()
         self.my_Process = Process(target = self.node.main_loop, args = ())
         self.my_Process.start()
@@ -49,49 +49,46 @@ class ToyChord(cmd2.Cmd):
         #key = line.split(', ')[0]
         #value = line.split(', ')[1]
         port = self.node.port
-        with Communication(port) as sock:
-            sock.socket_comm('insert:{}:{}'.format(line[0], line[1]))
+        address = self.ip_addr + '&' + port
+        with Communication(address) as sock:
+            sock.socket_comm('insert:{}:{}:{}'.format(line[0], line[1], address))
 
     def do_query(self, key):
         """Search a specific (key, value) pair or all of them"""
         port = self.node.port
+        address = self.ip_addr + '&' + port
         if (key == '*'):
-            with Communication(port) as sock:
+            with Communication(address) as sock:
                 sock.socket_comm('query_all')
         else:
-            with Communication(port) as sock:
+            with Communication(address) as sock:
                 sock.socket_comm('query:{}'.format(key))
 
     def do_delete(self, key):
         """Delete an existing (key, value) pair"""
         port = self.node.port
-        with Communication(port) as sock:
-            sock.socket_comm('delete:{}'.format(key))
+        address = self.ip_addr + '&' + port
+        with Communication(address) as sock:
+            sock.socket_comm('delete:{}:{}'.format(key, address))
 
     def do_depart(self, line):
         """A node departs from DHT"""
         port = self.node.port
-        if (port == '5000'):
-            with Communication(port) as sock:
+        address = self.ip_addr + '&' + port
+        if (address == "192.168.1.3&5000"):
+            with Communication(address) as sock:
                 sock.socket_comm('DHT_ends')
         else:
-            with Communication(port) as sock:
+            with Communication(address) as sock:
                 sock.socket_comm('depart')
         self.my_Process.join()
 
     def do_overlay(self, line):
         """Display DHT topology"""
         port = self.node.port
-        with Communication(port) as sock:
+        address = self.ip_addr + '&' + port
+        with Communication(address) as sock:
             sock.socket_comm('overlay')
-
-
-
-
-    def do_print(self, random):
-        port = self.node.port
-        print(port)
-
 
     def do_exit(self, line):
         return True
