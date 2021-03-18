@@ -33,7 +33,6 @@ class ToyChord(cmd2.Cmd):
         self.node = Bootstrap(self.ip_addr, port, consistency, replicas)
         self.my_Process = Process(target = self.node.main_loop, args = ())
         self.my_Process.start()
-        #sys.exit() #mallon
 
     def do_join(self, port):
         """A node (not bootstrap) joins the DHT"""
@@ -41,13 +40,10 @@ class ToyChord(cmd2.Cmd):
         self.node.join_DHT()
         self.my_Process = Process(target = self.node.main_loop, args = ())
         self.my_Process.start()
-        #sys.exit()
 
     @with_argument_list
     def do_insert(self, line):
         """Insert a new (key, value) pair"""
-        #key = line.split(', ')[0]
-        #value = line.split(', ')[1]
         port = self.node.port
         address = self.ip_addr + '&' + port
         with Communication(address) as sock:
