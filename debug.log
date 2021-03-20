@@ -24,3 +24,5 @@ ERROR:root:Data recv failed
 ERROR:root:Data recv failed
 ERROR:root:Data recv failed
 ERROR:root:Failed to receive message
+ERROR:root:Receive message was unsuccessful
+ERROR:root:Closure was unsuccessful

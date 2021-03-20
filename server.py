@@ -47,7 +47,8 @@ class Server(object):
                            'reply':self.reply,
                            'update_replicas':self.update_replicas,
                            'get_network_size':self.get_network_size,
-                           'send_to_succ':self.send_to_succ
+                           'send_to_succ':self.send_to_succ,
+                           'reply_query':self.reply_query
                        }
         #becomes true if the node departs
         self.terminates = False
@@ -336,7 +337,8 @@ class Server(object):
         else:
             #if number of replicas is one then no replicas should be added
             if (replicas == '0'):
-                self.message_q[sock].put('{}:{}'.format(key, value))
+                send_message(address, 'reply:{}:{}'.format(key, value))
+                self.message_q[sock].put('DONE')
             #if the circle of the Chord has occured, a reply message is sent to the caller (because all replicas are updated)
             #and the method returns
             elif (responsible == self.hash):
@@ -375,8 +377,8 @@ class Server(object):
                 #if the consistency is eventual, then the answer is passed to the caller and then the
                 #replicas are updated through the update_replicas method
                 if (self.consistency == 'E'):
-                    self.message_q[sock].put('{}:{}'.format(key, value))
-                    self.adjacent.send_adjacent('update_replicas:{}:{}:{}:{}:{}:{}'.format(hash_key, key, value, self.replicas - 1, self.hash, address), 1)
+                    send_message(address, 'reply:{}:{}'.format(key, value))
+                    self.message_q[sock].put(self.adjacent.send_adjacent('update_replicas:{}:{}:{}:{}:{}:{}'.format(hash_key, key, value, self.replicas - 1, self.hash, address), 1))
                 #else the update of the replicas is implemented before the return of the method
                 else:
                     self.message_q[sock].put(self.adjacent.send_adjacent('update_replicas:{}:{}:{}:{}:{}:{}'.format(hash_key, key, value, self.replicas - 1, self.hash, address), 1))
@@ -399,7 +401,7 @@ class Server(object):
         #else its node adds its songs and address to the message and sends it to its successor until the circle has occured
         else:
             self.data_lock.acquire()
-            songs =  []
+            songs = []
             for (key, value) in self.data.items():
                 songs.append(value)
             data = data + ':' + str(self.address) + ':' + str(songs)
@@ -430,12 +432,16 @@ class Server(object):
             self.message_q[sock].put('DONE')
 
 
-    """query -- query_forward_E -- query_forward_L implement QUERY KEY according to consistency (linear/eventual) """
+    """query -- query_forward_E -- query_forward_L -- reply_query implement QUERY KEY according to consistency (linear/eventual) """
 
+    def reply_query(self,data,sock):
+        _, addr, value = data.split(':')
+        print('{}:{}'.format(addr, value))
+        self.message_q[sock].put('DONE')
 
     def query_forward_E(self, data, sock):
         """This method is called for the "query key" case when the consistency is eventual"""
-        _, key, hash_of_first = data.split(':')
+        _, key, hash_of_first, address = data.split(':')
         key1 = key.encode()
         hash_key = sha1(key1).hexdigest()
         self.data_lock.acquire()
@@ -443,18 +449,20 @@ class Server(object):
         self.data_lock.release()
         #if the closest node to the node that implements the query has the song, it simply returns it
         if (value != (None, None)):
-            self.message_q[sock].put('{}:{}'.format(self.address, value[1]))
+            send_message(address, 'reply_query:{}:{}'.format(self.address, value[1]))
+            self.message_q[sock].put('DONE')
         #else if a circle has occured, the song has not been found so it does not exists. If not, the method is called from
         #the next nodes and if a node finds it, the method returns with the song
         else:
             if (hash_of_first == self.hash):
-                self.message_q[sock].put('This song does not exist')
+                send_message(address, 'reply_query:{}:{}'.format(self.address, 'This song does not exist'))
+                self.message_q[sock].put('DONE')
             else:
                 self.message_q[sock].put(self.adjacent.send_adjacent(data, 1))
 
     def query_forward_L(self, data, sock):
         """This method is called for the "query key" case when the consistency is linear"""
-        _, key, replicas = data.split(':')
+        _, key, replicas, address = data.split(':')
         key1 = key.encode()
         hash_key = sha1(key1).hexdigest()
         self.data_lock.acquire()
@@ -465,26 +473,29 @@ class Server(object):
             #if we haven't reached the last replica yet, call the method from the next node
             if int(replicas) > 1:
                 replicas = str(int(replicas)-1)
-                self.message_q[sock].put(self.adjacent.send_adjacent('query_forward_L:{}:{}'.format(key, replicas), 1))
+                self.message_q[sock].put(self.adjacent.send_adjacent('query_forward_L:{}:{}:{}'.format(key, replicas, address), 1))
             #else if the last replica exists, we return the song, else we reply "This song does not exist"
             else:
                 if(value == (None, None)):
-                    self.message_q[sock].put('This song does not exist')
+                    send_message(address,'reply_query:{}:{}'.format(self.address, 'This song does not exist'))
+                    self.message_q[sock].put('DONE')
                 else:
-                    self.message_q[sock].put('{}:{}'.format(self.address, value[1]))
+                    send_message(address,'reply_query:{}:{}'.format(self.address, value[1]))
+                    self.message_q[sock].put('DONE')
         #if we find the node that is responsible for the song
         elif self.place_here(hash_key):
             #if the number of replicas is greater than one we call the method from the next node with the correct number of replicas
             #to find the last replica of the song (if it exists)
             if (self.replicas > 1):
                 replicas = str(self.replicas-1)
-                self.message_q[sock].put(self.adjacent.send_adjacent('query_forward_L:{}:{}'.format(key, replicas), 1))
+                self.message_q[sock].put(self.adjacent.send_adjacent('query_forward_L:{}:{}:{}'.format(key, replicas, address), 1))
             #else this node has the only replica and it returns its value along with the address
             else:
-                self.message_q[sock].put('{}:{}'.format(self.address, value[1]))
+                send_message(address,'reply_query:{}:{}'.format(self.address, value[1]))
+                self.message_q[sock].put('DONE')
         #if we haven't reached the responsible node of the song we pass the message to the next node
         else:
-            self.message_q[sock].put(self.adjacent.send_adjacent('query_forward_L:{}:{}'.format(key, replicas), 1))
+            self.message_q[sock].put(self.adjacent.send_adjacent('query_forward_L:{}:{}:{}'.format(key, replicas, address), 1))
 
     def query(self, data, sock):
         """This method implements QUERY KEY according to the consistency (linear/eventual)
@@ -506,9 +517,7 @@ class Server(object):
             else:
                 #else it sends a "query_forward_message" to its successor to find the closest node that has a replica
                 #(even with a stale value)and prints the answer of the method
-                answer = self.adjacent.send_adjacent('query_forward_E:{}:{}'.format(key, self.hash), 1)
-                print(answer)
-                self.message_q[sock].put(answer)
+                self.message_q[sock].put(self.adjacent.send_adjacent('query_forward_E:{}:{}:{}'.format(key, self.hash, self.address), 1))
         #if the consistency is linear
         else:
             #if the node that implements the query is responsible for the song
@@ -519,9 +528,7 @@ class Server(object):
                     #so that it gets the value of the last replica of the song and prints the answer of the method
                     if (self.adjacent.succ_hash != self.hash):
                         replicas = str(self.replicas-1)
-                        answer = self.adjacent.send_adjacent('query_forward_L:{}:{}'.format(key, replicas), 1)
-                        print(answer)
-                        self.message_q[sock].put(answer)
+                        self.message_q[sock].put(self.adjacent.send_adjacent('query_forward_L:{}:{}:{}'.format(key, replicas, self.address), 1))
                     #if the node is alone in the DHT, it simply prints the (key, value) pair if it exists
                     #else "This song does not exist" message
                     else:
@@ -529,7 +536,7 @@ class Server(object):
                             print('{}:{}'.format(self.address, value[1]))
                             self.message_q[sock].put('{}'.format(value[1]))
                         else:
-                            print('This song does not exist')
+                            print('{}:{}'.format('This song does not exist'))
                             self.message_q[sock].put('This song does not exist')
                 #same if the number of replicas is one
                 else:
@@ -542,9 +549,7 @@ class Server(object):
             #if the node that implements the query is not responsible for the song then the nodes recursively
             #call this method until the outer if of the linear case, is activated
             else:
-                answer = self.adjacent.send_adjacent('query_forward_L:{}:{}'.format(key, '-1'), 1)
-                print(answer)
-                self.message_q[sock].put(answer)
+                self.message_q[sock].put(self.adjacent.send_adjacent('query_forward_L:{}:{}:{}'.format(key, '-1', self.address), 1))
 
 
     """delete -- delete_replicas implement DELETE"""
@@ -568,7 +573,8 @@ class Server(object):
                     self.message_q[sock].put(self.adjacent.send_adjacent('delete_replicas:{}:{}:{}:{}:{}:{}'.format(hash_key, key, value, replicas, responsible, address), 1))
         else:
             if (replicas == '0'):
-                self.message_q[sock].put('{}:{}'.format(key, value))
+                send_message(address, 'reply:{}:{}'.format(key, value))
+                self.message_q[sock].put('DONE')
             elif (responsible == self.hash):
                 send_message(address, 'reply:{}:{}'.format(key, value))
                 self.message_q[sock].put('DONE')
@@ -592,12 +598,12 @@ class Server(object):
             (key, value) = self.data.pop(hash_key, (None, None))
             self.data_lock.release()
             if ((key, value) == (None, None)):
-                print('This song does not exist')
+                send_message(address,'reply_query:{}:{}'.format(self.address, 'This song does not exist'))
                 self.message_q[sock].put('DONE')
             else:
                 if (self.consistency == 'E'):
-                    self.message_q[sock].put('{}:{}'.format(key, value))
-                    self.adjacent.send_adjacent('delete_replicas:{}:{}:{}:{}:{}:{}'.format(hash_key, key, value, self.replicas - 1, self.hash, address), 1)
+                    send_message(address, 'reply:{}:{}'.format(key, value))
+                    self.message_q[sock].put(self.adjacent.send_adjacent('delete_replicas:{}:{}:{}:{}:{}:{}'.format(hash_key, key, value, self.replicas - 1, self.hash, address), 1))
                 else:
                     self.message_q[sock].put(self.adjacent.send_adjacent('delete_replicas:{}:{}:{}:{}:{}:{}'.format(hash_key, key, value, self.replicas - 1, self.hash, address), 1))
         else:
@@ -620,7 +626,7 @@ class Server(object):
         network_size = send_message(self.main_address, 'get_network_size')
         #if the number of replicas is greater than the network size, before the depart of the node,
         #then the songs of the DHT do not have to be reallocated(all the nodes already contained all songs)
-        if(self.replicas > int(network_size)):
+        if(self.replicas > int(network_size)-1):
              pass
         #else the node sends its songs to its successor
         else:
@@ -669,7 +675,7 @@ class Bootstrap(Server):
         self.replicas = int(replicas)
 
     def join(self, data, sock):
-        """Every time a node join the DHT, bootstrap updates the sixe of the network and passes the
+        """Every time a node join the DHT, bootstrap updates the size of the network and passes the
            type of consistency, number of replicas to the new node through the message queue"""
         self.network_size += 1
         super(Bootstrap, self).join(data, sock)
