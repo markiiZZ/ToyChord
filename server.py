@@ -158,7 +158,7 @@ class Server(object):
         send_message(self.main_address, 'DHT_ends')
 
     def get_network_size(self, data, sock):
-        """This method is sent from a node to the bootstrap so that it gets informed of the sixe of the network"""
+        """This method is sent from a node to the bootstrap so that it gets informed of the size of the network"""
         send_message(self.main_address, 'get_network_size')
 
     def place_here(self, hashing):
@@ -176,14 +176,14 @@ class Server(object):
 
 
     def update_pred(self, data, sock):
-        """Called from the notify_adjacent method of the adjacent class to inform a node
+        """Called from the notify_adjacent method of the Adjacent class to inform a node
            that the new node is its predecessor"""
         _, pred_addr, pred_hash = data.split(':')
         self.adjacent.update_adjacent(pred_addr, pred_hash, 0)
         self.message_q[sock].put('Updated')
 
     def update_succ(self, data, sock):
-        """Called from the notify_adjacent method of the adjacent class to inform a node
+        """Called from the notify_adjacent method of the Adjacent class to inform a node
            that the new node is its successor"""
         _, succ_addr, succ_hash = data.split(':')
         self.adjacent.update_adjacent(succ_addr, succ_hash, 1)
@@ -323,7 +323,7 @@ class Server(object):
             if (replicas == '0' or responsible == self.hash):
                 self.message_q[sock].put('DONE')
             #else the nodes that need to store a replica, add the song to their data and decrement the number of replicas
-            #that have to be updated. if this number reaches zero ti returns
+            #that have to be updated. if this number reaches zero it returns
             else:
                 self.data_lock.acquire()
                 self.data[hash_key] = (key, value)
@@ -432,7 +432,8 @@ class Server(object):
             self.message_q[sock].put('DONE')
 
 
-    """query -- query_forward_E -- query_forward_L -- reply_query implement QUERY KEY according to consistency (linear/eventual) """
+    """query -- query_forward_E -- query_forward_L -- reply_query implement QUERY KEY according to consistency (linear/eventual)
+        ALONG WITH THE VALUE, WE ALSO PRINT THE ADDRESS OF THE NODE THAT GAVE THE ANSWER """
 
     def reply_query(self,data,sock):
         _, addr, value = data.split(':')
@@ -451,7 +452,7 @@ class Server(object):
         if (value != (None, None)):
             send_message(address, 'reply_query:{}:{}'.format(self.address, value[1]))
             self.message_q[sock].put('DONE')
-        #else if a circle has occured, the song has not been found so it does not exists. If not, the method is called from
+        #else if a circle has occured, the song has not been found so it does not exist. If not, the method is called from
         #the next nodes and if a node finds it, the method returns with the song
         else:
             if (hash_of_first == self.hash):
@@ -468,7 +469,7 @@ class Server(object):
         self.data_lock.acquire()
         value = self.data.get(hash_key, (None, None))
         self.data_lock.release()
-        #if the song has passed though the node that is responsible for it
+        #if the song has passed through the node that is responsible for it
         if (replicas != '-1'):
             #if we haven't reached the last replica yet, call the method from the next node
             if int(replicas) > 1:
@@ -489,10 +490,14 @@ class Server(object):
             if (self.replicas > 1):
                 replicas = str(self.replicas-1)
                 self.message_q[sock].put(self.adjacent.send_adjacent('query_forward_L:{}:{}:{}'.format(key, replicas, address), 1))
-            #else this node has the only replica and it returns its value along with the address
+            #else this node has the only replica and it returns its value along with the address (if it exists)
             else:
-                send_message(address,'reply_query:{}:{}'.format(self.address, value[1]))
-                self.message_q[sock].put('DONE')
+                if(value == (None, None)):
+                    send_message(address,'reply_query:{}:{}'.format(self.address, 'This song does not exist'))
+                    self.message_q[sock].put('DONE')
+                else:
+                    send_message(address,'reply_query:{}:{}'.format(self.address, value[1]))
+                    self.message_q[sock].put('DONE')
         #if we haven't reached the responsible node of the song we pass the message to the next node
         else:
             self.message_q[sock].put(self.adjacent.send_adjacent('query_forward_L:{}:{}:{}'.format(key, replicas, address), 1))
@@ -536,7 +541,7 @@ class Server(object):
                             print('{}:{}'.format(self.address, value[1]))
                             self.message_q[sock].put('{}'.format(value[1]))
                         else:
-                            print('{}:{}'.format('This song does not exist'))
+                            print('{}:{}'.format(self.address, 'This song does not exist'))
                             self.message_q[sock].put('This song does not exist')
                 #same if the number of replicas is one
                 else:
@@ -544,7 +549,7 @@ class Server(object):
                         print('{}:{}'.format(self.address, value[1]))
                         self.message_q[sock].put('{}'.format(value[1]))
                     else:
-                        print('This song does not exist')
+                        print('{}:{}'.format(self.address, 'This song does not exist'))
                         self.message_q[sock].put('This song does not exist')
             #if the node that implements the query is not responsible for the song then the nodes recursively
             #call this method until the outer if of the linear case, is activated
@@ -615,11 +620,12 @@ class Server(object):
 
     def send_to_succ(self):
         """Retrieve the songs from a departing node"""
-        #For each songs, through the update method, the first node that does not have the song, gets it, and
+        #For each song, through the update method, the first node that does not have the song, gets it
         #and becomes its last replica
         self.data_lock.acquire()
         for (key, value) in self.data.items():
             self.adjacent.send_adjacent('update:{}:{}:{}'.format(key, value[0], value[1]), 1)
+        self.data_lock.release()
 
     def depart(self, data, sock):
         """This method implements the depart of a random node (not the bootstrap)"""
