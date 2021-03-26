@@ -46,6 +46,7 @@ class ToyChord(cmd2.Cmd):
 
             Arguments:
             port is the port this node listens to"""
+        #bootstrap (ip,port) -> (192.168.0.2, 5000) for the VM's
         self.node = Server(self.ip_addr, port, "192.168.0.2&5000")
         self.node.join_DHT()
         self.my_Process = Process(target = self.node.main_loop, args = ())
@@ -97,6 +98,7 @@ class ToyChord(cmd2.Cmd):
             Arguments: None"""
         port = self.node.port
         address = self.ip_addr + '&' + port
+        #bootstrap (ip,port) -> (192.168.0.2, 5000) for the VM's  
         if (address == "192.168.0.2&5000"):
             with Communication(address) as sock:
                 sock.socket_comm('DHT_ends')

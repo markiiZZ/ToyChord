@@ -613,7 +613,9 @@ class Server(object):
             else:
                 if (self.consistency == 'E'):
                     send_message(address, 'reply:{}:{}'.format(key, value))
-                    self.message_q[sock].put(self.adjacent.send_adjacent('delete_replicas:{}:{}:{}:{}:{}:{}'.format(hash_key, key, value, self.replicas - 1, self.hash, address), 1))
+                    message = 'delete_replicas:{}:{}:{}:{}:{}:{}'.format(hash_key, key, value, self.replicas - 1, self.hash, address)
+                    threading.Thread(target = self.adjacent.send_adjacent, args = (message, 1)).start()
+                    self.message_q[sock].put('DONE')
                 else:
                     self.message_q[sock].put(self.adjacent.send_adjacent('delete_replicas:{}:{}:{}:{}:{}:{}'.format(hash_key, key, value, self.replicas - 1, self.hash, address), 1))
         else:
