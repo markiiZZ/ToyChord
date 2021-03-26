@@ -378,7 +378,10 @@ class Server(object):
                 #replicas are updated through the update_replicas method
                 if (self.consistency == 'E'):
                     send_message(address, 'reply:{}:{}'.format(key, value))
-                    self.message_q[sock].put(self.adjacent.send_adjacent('update_replicas:{}:{}:{}:{}:{}:{}'.format(hash_key, key, value, self.replicas - 1, self.hash, address), 1))
+                    message = 'update_replicas:{}:{}:{}:{}:{}:{}'.format(hash_key, key, value, self.replicas - 1, self.hash, address)
+                    threading.Thread(target = self.adjacent.send_adjacent, args = (message, 1)).start()
+                    self.message_q[sock].put('DONE')
+
                 #else the update of the replicas is implemented before the return of the method
                 else:
                     self.message_q[sock].put(self.adjacent.send_adjacent('update_replicas:{}:{}:{}:{}:{}:{}'.format(hash_key, key, value, self.replicas - 1, self.hash, address), 1))
@@ -386,6 +389,8 @@ class Server(object):
         else:
             self.data_lock.release()
             self.message_q[sock].put(self.adjacent.send_adjacent(data, 1))
+
+
 
 
     """print_node_songs -- query_all implement  QUERY * """

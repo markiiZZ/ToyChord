@@ -26,7 +26,13 @@ class ToyChord(cmd2.Cmd):
 
     @with_argument_list
     def do_bootstrap(self, line):
-        """Bootstrap enters the DHT"""
+        """ bootstrap consistency k port
+            Bootstrap enters the DHT
+
+            Arguments:
+            consistency must be either 'E' for eventual or 'L' for linearizability
+            k is the number of replicas
+            port is the port this node listens to"""
         consistency = line[0]
         replicas = line[1]
         port = line[2]
@@ -35,22 +41,35 @@ class ToyChord(cmd2.Cmd):
         self.my_Process.start()
 
     def do_join(self, port):
-        """A node (not bootstrap) joins the DHT"""
-        self.node = Server(self.ip_addr, port, "192.168.1.3&5000")
+        """ join port
+            A node (not bootstrap) joins the DHT
+
+            Arguments:
+            port is the port this node listens to"""
+        self.node = Server(self.ip_addr, port, "192.168.0.2&5000")
         self.node.join_DHT()
         self.my_Process = Process(target = self.node.main_loop, args = ())
         self.my_Process.start()
 
     @with_argument_list
     def do_insert(self, line):
-        """Insert a new (key, value) pair"""
+        """ insert key value
+            Insert a new (key, value) pair
+
+            Arguments:
+            key is a string (maybe a song's title)
+            value is a number"""
         port = self.node.port
         address = self.ip_addr + '&' + port
         with Communication(address) as sock:
             sock.socket_comm('insert:{}:{}:{}'.format(line[0], line[1], address))
 
     def do_query(self, key):
-        """Search a specific (key, value) pair or all of them"""
+        """ query key
+            Search a specific (key, value) pair or all of them
+
+            Arguments:
+            key is a string (maybe a song's title)"""
         port = self.node.port
         address = self.ip_addr + '&' + port
         if (key == '*'):
@@ -61,17 +80,24 @@ class ToyChord(cmd2.Cmd):
                 sock.socket_comm('query:{}'.format(key))
 
     def do_delete(self, key):
-        """Delete an existing (key, value) pair"""
+        """ delete key
+            Delete an existing (key, value) pair
+
+            Arguments:
+            key is a string (maybe a song's title)"""
         port = self.node.port
         address = self.ip_addr + '&' + port
         with Communication(address) as sock:
             sock.socket_comm('delete:{}:{}'.format(key, address))
 
     def do_depart(self, line):
-        """A node departs from DHT"""
+        """ depart
+            A node departs from DHT
+
+            Arguments: None"""
         port = self.node.port
         address = self.ip_addr + '&' + port
-        if (address == "192.168.1.3&5000"):
+        if (address == "192.168.0.2&5000"):
             with Communication(address) as sock:
                 sock.socket_comm('DHT_ends')
         else:
@@ -80,13 +106,20 @@ class ToyChord(cmd2.Cmd):
         self.my_Process.join()
 
     def do_overlay(self, line):
-        """Display DHT topology"""
+        """ overlay
+            Display DHT topology
+
+            Arguments: None"""
         port = self.node.port
         address = self.ip_addr + '&' + port
         with Communication(address) as sock:
             sock.socket_comm('overlay')
 
     def do_exit(self, line):
+        """ exit
+            alternative command for quit
+
+            Arguments: None"""
         return True
 
     cmd2.categorize((do_bootstrap,
