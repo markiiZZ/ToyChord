@@ -26,7 +26,7 @@ class ToyChord(cmd2.Cmd):
 
     @with_argument_list
     def do_bootstrap(self, line):
-        """ bootstrap consistency k port
+        """ bootstrap <consistency> <k> <port>
             Bootstrap enters the DHT
 
             Arguments:
@@ -41,7 +41,7 @@ class ToyChord(cmd2.Cmd):
         self.my_Process.start()
 
     def do_join(self, port):
-        """ join port
+        """ join <port>
             A node (not bootstrap) joins the DHT
 
             Arguments:
@@ -53,7 +53,7 @@ class ToyChord(cmd2.Cmd):
 
     @with_argument_list
     def do_insert(self, line):
-        """ insert key value
+        """ insert <key> <value>
             Insert a new (key, value) pair
 
             Arguments:
@@ -65,7 +65,7 @@ class ToyChord(cmd2.Cmd):
             sock.socket_comm('insert:{}:{}:{}'.format(line[0], line[1], address))
 
     def do_query(self, key):
-        """ query key
+        """ query <key>
             Search a specific (key, value) pair or all of them
 
             Arguments:
@@ -80,7 +80,7 @@ class ToyChord(cmd2.Cmd):
                 sock.socket_comm('query:{}'.format(key))
 
     def do_delete(self, key):
-        """ delete key
+        """ delete <key>
             Delete an existing (key, value) pair
 
             Arguments:
